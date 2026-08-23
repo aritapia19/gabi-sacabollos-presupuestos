@@ -171,6 +171,26 @@ export default function PresupuestoForm({
                 onChange={(e) => handleChangeCliente('telefono', e.target.value)}
               />
             </div>
+            <div className="form-group">
+              <label>CUIT / CUIL</label>
+              <input
+                type="text"
+                className="form-input"
+                placeholder="Ej: 20-12345678-9"
+                value={presupuesto.cliente.cuit || ''}
+                onChange={(e) => handleChangeCliente('cuit', e.target.value)}
+              />
+            </div>
+            <div className="form-group">
+              <label>Dirección</label>
+              <input
+                type="text"
+                className="form-input"
+                placeholder="Ej: Av. Corrientes 1234, CABA"
+                value={presupuesto.cliente.direccion || ''}
+                onChange={(e) => handleChangeCliente('direccion', e.target.value)}
+              />
+            </div>
           </div>
         </div>
 
@@ -215,26 +235,28 @@ export default function PresupuestoForm({
         </div>
       </div>
 
-      {/* Trabajos Rápidos */}
-      <div>
-        <div className="form-section-title">
-          <Sparkles size={16} />
-          <span>Agregar Trabajo Rápido</span>
+      {/* Trabajos Rápidos — OCULTO hasta nuevo aviso */}
+      {false && (
+        <div>
+          <div className="form-section-title">
+            <Sparkles size={16} />
+            <span>Agregar Trabajo Rápido</span>
+          </div>
+          <div className="service-badges-grid">
+            {PRESET_SERVICES.map((preset, idx) => (
+              <button
+                key={idx}
+                type="button"
+                className="service-quick-badge"
+                onClick={() => handleAddPreset(preset)}
+              >
+                <Plus size={12} />
+                <span>{preset.descripcion} (${preset.precio.toLocaleString('es-AR')})</span>
+              </button>
+            ))}
+          </div>
         </div>
-        <div className="service-badges-grid">
-          {PRESET_SERVICES.map((preset, idx) => (
-            <button
-              key={idx}
-              type="button"
-              className="service-quick-badge"
-              onClick={() => handleAddPreset(preset)}
-            >
-              <Plus size={12} />
-              <span>{preset.descripcion} (${preset.precio.toLocaleString('es-AR')})</span>
-            </button>
-          ))}
-        </div>
-      </div>
+      )}
 
       {/* Formulario de Agregar Ítem Adaptable a Celular */}
       <form onSubmit={handleAddItem} style={{ background: 'rgba(255, 107, 0, 0.05)', padding: '0.85rem', borderRadius: 'var(--radius-md)', border: '1px dashed var(--border-orange)' }}>

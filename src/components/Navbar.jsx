@@ -6,10 +6,11 @@ export default function Navbar({ activeTab, setActiveTab, isSupabaseConfigured }
   return (
     <nav className="navbar">
       <div className="brand-section">
-        <img src={logoImg} alt="Gabi Sacabollos Logo" className="brand-logo" />
+        <img src={logoImg} alt="Garaje Sacabollos Logo" className="brand-logo" />
         <div className="brand-info">
-          <h1>GABI <span>SACABOLLOS</span></h1>
-          <p>Presupuestos Automotrices • Sacabollos • Pintura • Detailing</p>
+          <h1>GARAJE <span>SACABOLLOS</span></h1>
+          <p>Gabriel Centurion</p>
+          <p style={{ fontSize: '0.75rem', opacity: 0.75 }}>CUIT 20-32254008-7</p>
         </div>
       </div>
 
