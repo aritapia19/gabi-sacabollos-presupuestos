@@ -13,20 +13,10 @@ const INITIAL_PRESUPUESTO = {
   fecha: new Date().toLocaleDateString('es-AR'),
   cliente: { nombre: '', telefono: '', email: '' },
   vehiculo: { marca: '', modelo: '', patente: '', anio: '', color: '' },
-  items: [
-    {
-      id: '1',
-      categoria: 'Sacabollos',
-      descripcion: 'Desabollado sin pintar en puerta delantera izquierda',
-      cantidad: 1,
-      horas: 3,
-      precio: 35000,
-      subtotal: 35000
-    }
-  ],
+  items: [],
   descuento: 0,
   incluirIva: true,
-  observaciones: 'Trabajo garantizado. Se entrega vehículo limpio y aspirado.'
+  observaciones: ''
 }
 
 export default function App() {

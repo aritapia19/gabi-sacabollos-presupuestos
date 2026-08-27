@@ -131,16 +131,6 @@ export default function PresupuestoForm({
           <Car size={22} />
           <span>Generador de Presupuesto</span>
         </div>
-        <div style={{ display: 'flex', gap: '0.5rem', width: '100%', justifyContent: 'stretch' }}>
-          <button className="btn-secondary" style={{ flex: 1 }} onClick={onShowPreview}>
-            <Printer size={16} />
-            <span>PDF</span>
-          </button>
-          <button className="btn-primary" style={{ flex: 1.5 }} onClick={onSavePresupuesto} disabled={isSaving}>
-            <Save size={16} />
-            <span>{isSaving ? 'Guardando...' : 'Guardar'}</span>
-          </button>
-        </div>
       </div>
 
       {/* Formulario Cliente y Vehículo */}
@@ -476,6 +466,18 @@ export default function PresupuestoForm({
             <span className="total-amount">${totalFinal.toLocaleString('es-AR')}</span>
           </div>
         </div>
+      </div>
+
+      {/* Botones de acción al final */}
+      <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem' }}>
+        <button className="btn-secondary" style={{ flex: 1 }} onClick={onShowPreview}>
+          <Printer size={16} />
+          <span>Vista PDF</span>
+        </button>
+        <button className="btn-primary" style={{ flex: 2 }} onClick={onSavePresupuesto} disabled={isSaving}>
+          <Save size={16} />
+          <span>{isSaving ? 'Guardando...' : 'Guardar Presupuesto'}</span>
+        </button>
       </div>
     </div>
   )
