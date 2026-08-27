@@ -1,8 +1,11 @@
-import React from 'react'
-import { Printer, X, Calendar, Phone, Clock } from 'lucide-react'
+import React, { useState } from 'react'
+import { Printer, X, Calendar, Phone, Clock, Share2, MessageCircle, Mail, Copy, Check } from 'lucide-react'
 import logoImg from '../assets/logo.jpg'
 
 export default function PresupuestoView({ presupuesto, onClose }) {
+  const [showShareMenu, setShowShareMenu] = useState(false)
+  const [copied, setCopied] = useState(false)
+
   const handlePrint = () => {
     window.print()
   }
@@ -16,16 +19,135 @@ export default function PresupuestoView({ presupuesto, onClose }) {
   const montoIva = incluirIva ? baseImponible * 0.21 : 0
   const totalFinal = baseImponible + montoIva
 
+  // Arma el texto del presupuesto para compartir
+  const buildShareText = () => {
+    const lineas = presupuesto.items.map(item =>
+      `• ${item.descripcion} (${item.cantidad}u${item.horas ? ` · ${item.horas}hs` : ''}) → $${(item.subtotal || 0).toLocaleString('es-AR')}`
+    ).join('\n')
+
+    return (
+      `🔧 *PRESUPUESTO #${presupuesto.numero || '0001'} — GARAGE SACABOLLOS*\n` +
+      `📅 Fecha: ${presupuesto.fecha || new Date().toLocaleDateString('es-AR')}\n\n` +
+      `👤 *Cliente:* ${presupuesto.cliente.nombre || 'Particular'}${presupuesto.cliente.telefono ? ` | ${presupuesto.cliente.telefono}` : ''}\n` +
+      `🚗 *Vehículo:* ${presupuesto.vehiculo.marca || ''} ${presupuesto.vehiculo.modelo || ''} — Patente: ${presupuesto.vehiculo.patente || 'S/D'}\n\n` +
+      `📋 *Detalle de trabajos:*\n${lineas}\n\n` +
+      `⏱ Total horas estimadas: ${totalHoras} hs\n` +
+      `💰 Subtotal neto: $${subtotalNeto.toLocaleString('es-AR')}\n` +
+      (descuentoNum > 0 ? `🏷 Descuento: -$${descuentoNum.toLocaleString('es-AR')}\n` : '') +
+      (incluirIva ? `📊 IVA 21%: +$${montoIva.toLocaleString('es-AR')}\n` : '') +
+      `✅ *TOTAL: $${totalFinal.toLocaleString('es-AR')}*\n\n` +
+      `📍 Pasteur 1009, Pilar | 📞 11-3105-0182\n` +
+      `Válido por 15 días hábiles.`
+    )
+  }
+
+  const handleShareWhatsApp = () => {
+    const text = encodeURIComponent(buildShareText())
+    window.open(`https://wa.me/?text=${text}`, '_blank')
+    setShowShareMenu(false)
+  }
+
+  const handleShareEmail = () => {
+    const subject = encodeURIComponent(`Presupuesto #${presupuesto.numero || '0001'} — Garage Sacabollos`)
+    const body = encodeURIComponent(buildShareText())
+    window.open(`mailto:?subject=${subject}&body=${body}`, '_blank')
+    setShowShareMenu(false)
+  }
+
+  const handleCopyText = async () => {
+    try {
+      await navigator.clipboard.writeText(buildShareText())
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      // fallback para iOS
+      const ta = document.createElement('textarea')
+      ta.value = buildShareText()
+      document.body.appendChild(ta)
+      ta.select()
+      document.execCommand('copy')
+      document.body.removeChild(ta)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    }
+    setShowShareMenu(false)
+  }
+
+  // Web Share API nativa (funciona bien en Android/iOS)
+  const handleNativeShare = async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `Presupuesto #${presupuesto.numero || '0001'} — Garage Sacabollos`,
+          text: buildShareText(),
+        })
+      } catch (err) {
+        // usuario canceló, no hacer nada
+      }
+    } else {
+      setShowShareMenu(true)
+    }
+  }
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
         {/* Controles superiores */}
-        <div className="no-print" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-          <h3 style={{ fontSize: '1.1rem', fontWeight: '700', color: '#fff' }}>Vista Previa de Comprobante / PDF</h3>
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
+        <div className="no-print" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+          <h3 style={{ fontSize: '1.1rem', fontWeight: '700', color: '#fff' }}>Vista Previa / PDF</h3>
+          <div style={{ display: 'flex', gap: '0.5rem', position: 'relative' }}>
+
+            {/* Botón Compartir */}
+            <div style={{ position: 'relative' }}>
+              <button
+                className="btn-secondary"
+                onClick={handleNativeShare}
+                style={{ background: 'rgba(34,197,94,0.15)', borderColor: 'rgba(34,197,94,0.5)', color: '#22c55e' }}
+              >
+                <Share2 size={16} />
+                <span>Compartir</span>
+              </button>
+
+              {/* Menú fallback (desktop) */}
+              {showShareMenu && (
+                <div style={{
+                  position: 'absolute', top: '110%', right: 0, zIndex: 999,
+                  background: '#1f2937', border: '1px solid #374151',
+                  borderRadius: '10px', padding: '0.5rem', minWidth: '180px',
+                  boxShadow: '0 8px 24px rgba(0,0,0,0.5)'
+                }}>
+                  <button onClick={handleShareWhatsApp} style={{
+                    display: 'flex', alignItems: 'center', gap: '0.6rem',
+                    width: '100%', padding: '0.6rem 0.8rem', background: 'transparent',
+                    border: 'none', color: '#25D366', cursor: 'pointer', borderRadius: '6px',
+                    fontSize: '0.9rem', fontWeight: '600'
+                  }}>
+                    <MessageCircle size={16} /> WhatsApp
+                  </button>
+                  <button onClick={handleShareEmail} style={{
+                    display: 'flex', alignItems: 'center', gap: '0.6rem',
+                    width: '100%', padding: '0.6rem 0.8rem', background: 'transparent',
+                    border: 'none', color: '#60a5fa', cursor: 'pointer', borderRadius: '6px',
+                    fontSize: '0.9rem', fontWeight: '600'
+                  }}>
+                    <Mail size={16} /> Email
+                  </button>
+                  <button onClick={handleCopyText} style={{
+                    display: 'flex', alignItems: 'center', gap: '0.6rem',
+                    width: '100%', padding: '0.6rem 0.8rem', background: 'transparent',
+                    border: 'none', color: '#d1d5db', cursor: 'pointer', borderRadius: '6px',
+                    fontSize: '0.9rem', fontWeight: '600'
+                  }}>
+                    {copied ? <Check size={16} color="#22c55e" /> : <Copy size={16} />}
+                    {copied ? '¡Copiado!' : 'Copiar texto'}
+                  </button>
+                </div>
+              )}
+            </div>
+
             <button className="btn-primary" onClick={handlePrint}>
               <Printer size={16} />
-              <span>Imprimir / Descargar PDF</span>
+              <span>Imprimir / PDF</span>
             </button>
             <button className="btn-secondary" onClick={onClose}>
               <X size={18} />
@@ -37,10 +159,13 @@ export default function PresupuestoView({ presupuesto, onClose }) {
         <div className="invoice-preview-card">
           <div className="invoice-header">
             <div className="invoice-logo-block">
-              <img src={logoImg} alt="Gabi Sacabollos Logo" className="invoice-logo-img" />
+              <img src={logoImg} alt="Garage Sacabollos Logo" className="invoice-logo-img" />
               <div className="invoice-brand-text">
-                <h2>Gabi Sacabollos</h2>
-                <p>Reparación • Sacabollos • Pintura • Detailing</p>
+                <h2>Garage Sacabollos</h2>
+                <p>Gabriel Centurion — CUIT 20-32254008-7</p>
+                <p style={{ fontSize: '0.75rem', color: '#6b7280' }}>
+                  Pasteur 1009, Pilar &nbsp;•&nbsp; 11-3105-0182
+                </p>
               </div>
             </div>
             <div className="invoice-meta">
@@ -64,10 +189,20 @@ export default function PresupuestoView({ presupuesto, onClose }) {
                   {presupuesto.cliente.telefono}
                 </div>
               )}
+              {presupuesto.cliente.cuit && (
+                <div style={{ fontSize: '0.82rem', color: '#4b5563', marginTop: '2px' }}>
+                  CUIT/CUIL: {presupuesto.cliente.cuit}
+                </div>
+              )}
+              {presupuesto.cliente.direccion && (
+                <div style={{ fontSize: '0.82rem', color: '#4b5563', marginTop: '2px' }}>
+                  📍 {presupuesto.cliente.direccion}
+                </div>
+              )}
             </div>
 
             <div className="detail-block">
-              <h4>Vehículo & Patente</h4>
+              <h4>Vehículo &amp; Patente</h4>
               <p style={{ textTransform: 'uppercase' }}>
                 {presupuesto.vehiculo.marca || 'S/D'} {presupuesto.vehiculo.modelo || ''}
               </p>
@@ -77,7 +212,7 @@ export default function PresupuestoView({ presupuesto, onClose }) {
             </div>
           </div>
 
-          {/* Tabla de Detalle con Formato Unificado */}
+          {/* Tabla de Detalle */}
           <table className="invoice-table">
             <thead>
               <tr>
@@ -154,7 +289,7 @@ export default function PresupuestoView({ presupuesto, onClose }) {
           )}
 
           <div className="invoice-footer">
-            Gabi Sacabollos • Taller Especializado de Sacabollos, Chapa, Pintura & Detailing Automotor
+            Garage Sacabollos • Taller Especializado de Sacabollos, Chapa, Pintura &amp; Detailing Automotor
             <br />
             ¡Gracias por confiar en nuestro trabajo!
           </div>
