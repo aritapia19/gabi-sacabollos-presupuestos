@@ -1,10 +1,10 @@
-import React, { useState } from 'react'
-import { Printer, X, Calendar, Phone, Clock, Share2, MessageCircle, Mail, Copy, Check } from 'lucide-react'
+import React, { useState, useRef } from 'react'
+import { Printer, X, Calendar, Phone, Clock, Share2, Download, Loader } from 'lucide-react'
 import logoImg from '../assets/logo.jpg'
 
 export default function PresupuestoView({ presupuesto, onClose }) {
-  const [showShareMenu, setShowShareMenu] = useState(false)
-  const [copied, setCopied] = useState(false)
+  const [isGenerating, setIsGenerating] = useState(false)
+  const invoiceRef = useRef(null)
 
   const handlePrint = () => {
     window.print()
@@ -19,144 +19,105 @@ export default function PresupuestoView({ presupuesto, onClose }) {
   const montoIva = incluirIva ? baseImponible * 0.21 : 0
   const totalFinal = baseImponible + montoIva
 
-  // Arma el texto del presupuesto para compartir
-  const buildShareText = () => {
-    const lineas = presupuesto.items.map(item =>
-      `• ${item.descripcion} (${item.cantidad}u${item.horas ? ` · ${item.horas}hs` : ''}) → $${(item.subtotal || 0).toLocaleString('es-AR')}`
-    ).join('\n')
+  const getPdfFilename = () =>
+    `Presupuesto-${presupuesto.numero || '0001'}-${(presupuesto.cliente.nombre || 'cliente').replace(/\s+/g, '_')}.pdf`
 
-    return (
-      `🔧 *PRESUPUESTO #${presupuesto.numero || '0001'} — GARAGE SACABOLLOS*\n` +
-      `📅 Fecha: ${presupuesto.fecha || new Date().toLocaleDateString('es-AR')}\n\n` +
-      `👤 *Cliente:* ${presupuesto.cliente.nombre || 'Particular'}${presupuesto.cliente.telefono ? ` | ${presupuesto.cliente.telefono}` : ''}\n` +
-      `🚗 *Vehículo:* ${presupuesto.vehiculo.marca || ''} ${presupuesto.vehiculo.modelo || ''} — Patente: ${presupuesto.vehiculo.patente || 'S/D'}\n\n` +
-      `📋 *Detalle de trabajos:*\n${lineas}\n\n` +
-      `⏱ Total horas estimadas: ${totalHoras} hs\n` +
-      `💰 Subtotal neto: $${subtotalNeto.toLocaleString('es-AR')}\n` +
-      (descuentoNum > 0 ? `🏷 Descuento: -$${descuentoNum.toLocaleString('es-AR')}\n` : '') +
-      (incluirIva ? `📊 IVA 21%: +$${montoIva.toLocaleString('es-AR')}\n` : '') +
-      `✅ *TOTAL: $${totalFinal.toLocaleString('es-AR')}*\n\n` +
-      `📍 Pasteur 1009, Pilar | 📞 11-3105-0182\n` +
-      `Válido por 15 días hábiles.`
-    )
-  }
+  // Genera el PDF como Blob usando html2pdf.js
+  const generatePdfBlob = async () => {
+    const html2pdf = (await import('html2pdf.js')).default
+    const element = invoiceRef.current
 
-  const handleShareWhatsApp = () => {
-    const text = encodeURIComponent(buildShareText())
-    window.open(`https://wa.me/?text=${text}`, '_blank')
-    setShowShareMenu(false)
-  }
-
-  const handleShareEmail = () => {
-    const subject = encodeURIComponent(`Presupuesto #${presupuesto.numero || '0001'} — Garage Sacabollos`)
-    const body = encodeURIComponent(buildShareText())
-    window.open(`mailto:?subject=${subject}&body=${body}`, '_blank')
-    setShowShareMenu(false)
-  }
-
-  const handleCopyText = async () => {
-    try {
-      await navigator.clipboard.writeText(buildShareText())
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    } catch {
-      // fallback para iOS
-      const ta = document.createElement('textarea')
-      ta.value = buildShareText()
-      document.body.appendChild(ta)
-      ta.select()
-      document.execCommand('copy')
-      document.body.removeChild(ta)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
+    const opt = {
+      margin: [8, 8, 8, 8],
+      filename: getPdfFilename(),
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+      },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
     }
-    setShowShareMenu(false)
+
+    const pdf = html2pdf().set(opt).from(element)
+    return await pdf.outputPdf('blob')
   }
 
-  // Web Share API nativa (funciona bien en Android/iOS)
-  const handleNativeShare = async () => {
-    if (navigator.share) {
-      try {
+  // Compartir: intenta Web Share API con archivo, sino descarga
+  const handleShare = async () => {
+    setIsGenerating(true)
+    try {
+      const blob = await generatePdfBlob()
+      const file = new File([blob], getPdfFilename(), { type: 'application/pdf' })
+
+      // Web Share API con archivo (funciona en Android Chrome, iOS Safari 15+)
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
         await navigator.share({
           title: `Presupuesto #${presupuesto.numero || '0001'} — Garage Sacabollos`,
-          text: buildShareText(),
+          files: [file],
         })
-      } catch (err) {
-        // usuario canceló, no hacer nada
+      } else {
+        // Fallback: descarga el PDF directamente
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = getPdfFilename()
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        URL.revokeObjectURL(url)
       }
-    } else {
-      setShowShareMenu(true)
+    } catch (err) {
+      if (err.name !== 'AbortError') {
+        console.error('Error generando PDF:', err)
+        alert('No se pudo generar el PDF. Intentá con el botón Imprimir.')
+      }
+    } finally {
+      setIsGenerating(false)
     }
   }
 
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+
         {/* Controles superiores */}
         <div className="no-print" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.5rem' }}>
           <h3 style={{ fontSize: '1.1rem', fontWeight: '700', color: '#fff' }}>Vista Previa / PDF</h3>
-          <div style={{ display: 'flex', gap: '0.5rem', position: 'relative' }}>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
 
-            {/* Botón Compartir */}
-            <div style={{ position: 'relative' }}>
-              <button
-                className="btn-secondary"
-                onClick={handleNativeShare}
-                style={{ background: 'rgba(34,197,94,0.15)', borderColor: 'rgba(34,197,94,0.5)', color: '#22c55e' }}
-              >
-                <Share2 size={16} />
-                <span>Compartir</span>
-              </button>
+            {/* Botón Compartir PDF */}
+            <button
+              className="btn-secondary"
+              onClick={handleShare}
+              disabled={isGenerating}
+              style={{
+                background: isGenerating ? 'rgba(34,197,94,0.08)' : 'rgba(34,197,94,0.15)',
+                borderColor: 'rgba(34,197,94,0.5)',
+                color: '#22c55e',
+                minWidth: '130px'
+              }}
+            >
+              {isGenerating
+                ? <><Loader size={16} style={{ animation: 'spin 1s linear infinite' }} /><span>Generando...</span></>
+                : <><Share2 size={16} /><span>Compartir PDF</span></>
+              }
+            </button>
 
-              {/* Menú fallback (desktop) */}
-              {showShareMenu && (
-                <div style={{
-                  position: 'absolute', top: '110%', right: 0, zIndex: 999,
-                  background: '#1f2937', border: '1px solid #374151',
-                  borderRadius: '10px', padding: '0.5rem', minWidth: '180px',
-                  boxShadow: '0 8px 24px rgba(0,0,0,0.5)'
-                }}>
-                  <button onClick={handleShareWhatsApp} style={{
-                    display: 'flex', alignItems: 'center', gap: '0.6rem',
-                    width: '100%', padding: '0.6rem 0.8rem', background: 'transparent',
-                    border: 'none', color: '#25D366', cursor: 'pointer', borderRadius: '6px',
-                    fontSize: '0.9rem', fontWeight: '600'
-                  }}>
-                    <MessageCircle size={16} /> WhatsApp
-                  </button>
-                  <button onClick={handleShareEmail} style={{
-                    display: 'flex', alignItems: 'center', gap: '0.6rem',
-                    width: '100%', padding: '0.6rem 0.8rem', background: 'transparent',
-                    border: 'none', color: '#60a5fa', cursor: 'pointer', borderRadius: '6px',
-                    fontSize: '0.9rem', fontWeight: '600'
-                  }}>
-                    <Mail size={16} /> Email
-                  </button>
-                  <button onClick={handleCopyText} style={{
-                    display: 'flex', alignItems: 'center', gap: '0.6rem',
-                    width: '100%', padding: '0.6rem 0.8rem', background: 'transparent',
-                    border: 'none', color: '#d1d5db', cursor: 'pointer', borderRadius: '6px',
-                    fontSize: '0.9rem', fontWeight: '600'
-                  }}>
-                    {copied ? <Check size={16} color="#22c55e" /> : <Copy size={16} />}
-                    {copied ? '¡Copiado!' : 'Copiar texto'}
-                  </button>
-                </div>
-              )}
-            </div>
-
+            {/* Botón Imprimir */}
             <button className="btn-primary" onClick={handlePrint}>
               <Printer size={16} />
-              <span>Imprimir / PDF</span>
+              <span>Imprimir</span>
             </button>
+
             <button className="btn-secondary" onClick={onClose}>
               <X size={18} />
             </button>
           </div>
         </div>
 
-        {/* Tarjeta Impresa / Comprobante */}
-        <div className="invoice-preview-card">
+        {/* Tarjeta Impresa / Comprobante — este div se convierte en PDF */}
+        <div className="invoice-preview-card" ref={invoiceRef}>
           <div className="invoice-header">
             <div className="invoice-logo-block">
               <img src={logoImg} alt="Garage Sacabollos Logo" className="invoice-logo-img" />
@@ -294,6 +255,11 @@ export default function PresupuestoView({ presupuesto, onClose }) {
             ¡Gracias por confiar en nuestro trabajo!
           </div>
         </div>
+
+        {/* Spinner CSS inline */}
+        <style>{`
+          @keyframes spin { to { transform: rotate(360deg); } }
+        `}</style>
       </div>
     </div>
   )
